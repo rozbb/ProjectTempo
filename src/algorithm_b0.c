@@ -7,6 +7,10 @@
  *              (assuming all calls to OpenSSL execute in CT)                   *
  ********************************************************************************/
 
+/* this version includes an optimization proposed by Michael Rosenberg
+ * see PR for more details: https://github.com/afonsoarriaga/ProjectTempo/pull/2
+ */
+
 #include <openssl/bn.h>
 
 #include "algorithms.h"
@@ -14,8 +18,8 @@
 #include "fips202.h"
 
 /*
-* Helper to precompute powers of Q: Q^1, Q^2, ..., Q^128.
-* Returns a static array of 8 BIGNUM* (powers[0] = Q^1, ..., powers[7] = Q^128).
+ * Helper to precompute powers of Q: Q^1, Q^2, ..., Q^128.
+ * Returns a static array of 8 BIGNUM* (powers[0] = Q^1, ..., powers[7] = Q^128).
  * Only computes once (lazy initialization).
  */
 static BIGNUM **get_powers_of_q(BN_CTX *bn_ctx) {
