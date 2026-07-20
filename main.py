@@ -235,7 +235,11 @@ def bench_kem(keypair, enc, dec, k_idx: int) -> float:
     return 1000.0 * (end - start) / NUM_RUNS
 
 
-def bench_pake(init_start, init_end, resp, k_idx: int) -> float:
+def bench_pake(init_start, init_end, resp, k_idx: int):
+    """Benchmark each NoIC phase separately.
+
+    Returns a tuple of average ms per run for (initStart, resp, initEnd).
+    """
     pk_len = PK_SIZES[k_idx]
     sk_len = SK_SIZES[k_idx]
     ct_len = CT_SIZES[k_idx]
@@ -254,15 +258,39 @@ def bench_pake(init_start, init_end, resp, k_idx: int) -> float:
     key_init = (C.c_ubyte * pw_len)()
     key_resp = (C.c_ubyte * pw_len)()
 
+    # Produce valid state (msg1, pk, sk, msg2) for the resp/initEnd loops,
+    # and confirm the protocol succeeds before timing.
+    init_start(msg1, pk, sk, pw, sid)
+    resp(key_resp, msg2, msg1, pw, sid)
+    rc = init_end(key_init, msg2, msg1, pk, sk, sid)
+    if rc != 0 or bytes(key_init) != bytes(key_resp):
+        raise SystemExit("PAKE failure during benchmark")
+
+    # Bench initStart
     start = time.perf_counter()
     for _ in range(NUM_RUNS):
         init_start(msg1, pk, sk, pw, sid)
-        resp(key_resp, msg2, msg1, pw, sid)
-        rc = init_end(key_init, msg2, msg1, pk, sk, sid)
-        if rc != 0 or bytes(key_init) != bytes(key_resp):
-            raise SystemExit("PAKE failure during benchmark")
     end = time.perf_counter()
-    return 1000.0 * (end - start) / NUM_RUNS
+    t_init_start = 1000.0 * (end - start) / NUM_RUNS
+
+    # Bench resp
+    start = time.perf_counter()
+    for _ in range(NUM_RUNS):
+        resp(key_resp, msg2, msg1, pw, sid)
+    end = time.perf_counter()
+    t_resp = 1000.0 * (end - start) / NUM_RUNS
+
+    # Bench initEnd
+    start = time.perf_counter()
+    for _ in range(NUM_RUNS):
+        rc = init_end(key_init, msg2, msg1, pk, sk, sid)
+    end = time.perf_counter()
+    t_init_end = 1000.0 * (end - start) / NUM_RUNS
+
+    if rc != 0 or bytes(key_init) != bytes(key_resp):
+        raise SystemExit("PAKE failure during benchmark")
+
+    return t_init_start, t_resp, t_init_end
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +302,9 @@ def main():
 
     samplentt_timings = [[0.0] * NUM_ALGOS for _ in range(NUM_K)]
     kem_timings       = [[0.0] * NUM_ALGOS for _ in range(NUM_K)]
-    pake_timings      = [[0.0] * NUM_ALGOS for _ in range(NUM_K)]
+    pake_init_start_timings = [[0.0] * NUM_ALGOS for _ in range(NUM_K)]
+    pake_resp_timings       = [[0.0] * NUM_ALGOS for _ in range(NUM_K)]
+    pake_init_end_timings   = [[0.0] * NUM_ALGOS for _ in range(NUM_K)]
 
     # 1) Sanity checks: each library exactly once
     print("Running sanity checks...")
@@ -316,9 +346,13 @@ def main():
         for a in range(NUM_ALGOS):
             lib = C.CDLL(LIB_PATHS[k_idx][a])
             init_start, init_end, resp = resolve_pake_api(lib)
-            t = bench_pake(init_start, init_end, resp, k_idx)
-            pake_timings[k_idx][a] = t
-            print(f"... {pake_labels[k_idx]} / {algo_names[a]}: {t:.4f} ms")
+            t_is, t_resp, t_ie = bench_pake(init_start, init_end, resp, k_idx)
+            pake_init_start_timings[k_idx][a] = t_is
+            pake_resp_timings[k_idx][a]       = t_resp
+            pake_init_end_timings[k_idx][a]   = t_ie
+            print(f"... {pake_labels[k_idx]} / {algo_names[a]}: "
+                  f"initStart {t_is:.4f} ms | resp {t_resp:.4f} ms | "
+                  f"initEnd {t_ie:.4f} ms")
 
     # 3) Print tables
     print("\nSampleNTT results (gen_matrix; cycles per run with RSD%)\n")
@@ -332,8 +366,14 @@ def main():
     print("\nKEM results (keygen+enc+dec, average ms per run)\n")
     print_table(kem_labels, algo_names, kem_timings)
 
-    print("\nPAKE results (NoIC initStart+resp+initEnd, average ms per run)\n")
-    print_table(pake_labels, algo_names, pake_timings)
+    print("\nPAKE results (NoIC initStart, average ms per run)\n")
+    print_table(pake_labels, algo_names, pake_init_start_timings)
+
+    print("\nPAKE results (NoIC resp, average ms per run)\n")
+    print_table(pake_labels, algo_names, pake_resp_timings)
+
+    print("\nPAKE results (NoIC initEnd, average ms per run)\n")
+    print_table(pake_labels, algo_names, pake_init_end_timings)
 
 
 if __name__ == "__main__":
