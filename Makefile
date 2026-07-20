@@ -182,22 +182,27 @@ $(FIPS202_OBJ): $(SRC_NOIC_DIR)/fips202.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 # libraries
+# indcpa.c always calls algorithmA0, so algorithm_a0.o must be linked into every
+# variant (duplicates are dropped by $^ for the a0 variant itself).
 $(LIB_DIR)/libnoic_mlkem512_%.so: 	$(MLKEM512_OBJ) \
 								$(OBJ_MLKEM512_DIR)/indcpa_%.o \
 								$(OBJ_MLKEM512_DIR)/twofeistel_%.o \
-								$(OBJ_SAMPLENTT_DIR)/algorithm_%.o
+								$(OBJ_SAMPLENTT_DIR)/algorithm_%.o \
+								$(OBJ_SAMPLENTT_DIR)/algorithm_a0.o
 	$(CC) -shared -o $@ $^ $(OPENSSL_LIB)
 
 $(LIB_DIR)/libnoic_mlkem768_%.so:	$(MLKEM768_OBJ) \
 								$(OBJ_MLKEM768_DIR)/indcpa_%.o \
 								$(OBJ_MLKEM768_DIR)/twofeistel_%.o \
-								$(OBJ_SAMPLENTT_DIR)/algorithm_%.o
+								$(OBJ_SAMPLENTT_DIR)/algorithm_%.o \
+								$(OBJ_SAMPLENTT_DIR)/algorithm_a0.o
 	$(CC) -shared -o $@ $^ $(OPENSSL_LIB)
 
 $(LIB_DIR)/libnoic_mlkem1024_%.so:	$(MLKEM1024_OBJ) \
 								$(OBJ_MLKEM1024_DIR)/indcpa_%.o \
 								$(OBJ_MLKEM1024_DIR)/twofeistel_%.o \
-								$(OBJ_SAMPLENTT_DIR)/algorithm_%.o
+								$(OBJ_SAMPLENTT_DIR)/algorithm_%.o \
+								$(OBJ_SAMPLENTT_DIR)/algorithm_a0.o
 	$(CC) -shared -o $@ $^ $(OPENSSL_LIB)
 
 $(LIB_DIR)/libsamplentt.so: $(SAMPLENTT_OBJ) $(FIPS202_OBJ) $(OPENSSL_LIB)

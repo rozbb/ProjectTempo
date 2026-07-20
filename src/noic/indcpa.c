@@ -186,20 +186,7 @@ void gen_matrix(polyvec *a, const uint8_t seed[KYBER_SYMBYTES], int transposed) 
                 //xof_absorb(&state, seed, (uint8_t)j, (uint8_t)i);
             }
 
-            #if SAMPLENTT == 10   // A0
-                algorithmA0(a[i].vec[j].coeffs, extseed);
-            #elif SAMPLENTT == 11 // A1
-                algorithmA1(a[i].vec[j].coeffs, extseed);
-            #elif SAMPLENTT == 20 // B0
-                algorithmB0(a[i].vec[j].coeffs, extseed);
-            #elif SAMPLENTT == 30 // C0
-                algorithmC0(a[i].vec[j].coeffs, extseed);
-            #elif SAMPLENTT == 31 // C1
-                algorithmC1(a[i].vec[j].coeffs, extseed);
-            #else
-                #error "Unsupported SAMPLENTT value"
-            #endif
-            
+            algorithmA0(a[i].vec[j].coeffs, extseed);
             /*
             xof_squeezeblocks(buf, GEN_MATRIX_NBLOCKS, &state);
             buflen = GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES;
